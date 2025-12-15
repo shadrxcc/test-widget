@@ -7,7 +7,7 @@
   'use strict';
 
   // Configuration
-  const API_BASE_URL = 'https://your-api.com/api';
+  const API_BASE_URL = 'https://staging.dispute.evoolv.com/';
   
   class ChatWidget {
     constructor(config) {
@@ -41,9 +41,9 @@
     }
 
     async fetchWidgetConfig() {
-      const response = await fetch(`${API_BASE_URL}/widget/config`, {
+      const response = await fetch(`${API_BASE_URL}organizations/chat-widgets/30f2f20f-9160-4268-a30e-8712890843f1`, {
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiN2M1OTgzMy0wM2UxLTRhOGUtYjM5Ny05ZjU1MzlmOTJkMzAiLCJlbWFpbCI6InNrcGxheWRpcnR5QHByb3Rvbi5tZSIsInVzZXJSb2xlIjoiYWRtaW4iLCJwZXJtaXNzaW9ucyI6W10sImF1dGhTZXNzaW9uSWQiOiI0NWRmNDg2Ni04MzFkLTRiNGEtYWNiNS0yZjBlMTBlMzkzMWIiLCJleHBpcnkiOjE3NjY0NDE3MDA0MDgsImlhdCI6MTc2NTgzNjkwMCwiZXhwIjoxNzY2NDQxNzAwfQ.kvWzB0T9JBi9_AhLl4NrXvG09cPBrtc6XY6qsEc2VvM`,
           'Content-Type': 'application/json'
         }
       });
@@ -772,3 +772,4 @@
     });
   }
 })();
+
