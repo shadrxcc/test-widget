@@ -1,6 +1,5 @@
 /**
  * Chat Widget - Main Script
- * This file should be hosted on your CDN
  */
 
 (function() {
@@ -41,9 +40,9 @@
     }
 
     async fetchWidgetConfig() {
-      const response = await fetch(`${API_BASE_URL}organizations/chat-widgets/30f2f20f-9160-4268-a30e-8712890843f1`, {
+      const response = await fetch(`${API_BASE_URL}organizations/chat-widgets`, {
         headers: {
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiN2M1OTgzMy0wM2UxLTRhOGUtYjM5Ny05ZjU1MzlmOTJkMzAiLCJlbWFpbCI6InNrcGxheWRpcnR5QHByb3Rvbi5tZSIsInVzZXJSb2xlIjoiYWRtaW4iLCJwZXJtaXNzaW9ucyI6W10sImF1dGhTZXNzaW9uSWQiOiI0NWRmNDg2Ni04MzFkLTRiNGEtYWNiNS0yZjBlMTBlMzkzMWIiLCJleHBpcnkiOjE3NjY0NDE3MDA0MDgsImlhdCI6MTc2NTgzNjkwMCwiZXhwIjoxNzY2NDQxNzAwfQ.kvWzB0T9JBi9_AhLl4NrXvG09cPBrtc6XY6qsEc2VvM`,
+          'apiKey': this.apiToken,
           'Content-Type': 'application/json'
         }
       });
@@ -129,9 +128,7 @@
             
             <div class="chat-widget-powered">
               <span class="powered-text">Powered by:</span>
-              <svg class="powered-logo" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z"/>
-              </svg>
+              <img src="https://evoolv-upload-bucket.s3.amazonaws.com/57271314-b2a9-4d43-b297-cad6c4e958b4-small-logo.webp" alt="Evoolv logo"/>
             </div>
           </div>
         </div>
@@ -743,13 +740,6 @@
           height: 20px;
           color: #4F46E5;
         }
-        
-        @media (max-width: 480px) {
-          .chat-widget-window {
-            width: calc(100vw - 40px);
-            height: calc(100vh - 100px);
-          }
-        }
       `;
       
       const styleSheet = document.createElement('style');
@@ -772,4 +762,5 @@
     });
   }
 })();
+
 
