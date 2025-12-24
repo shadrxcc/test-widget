@@ -215,35 +215,6 @@
         </div>
       `;
       
-      const styleSheet = document.createElement('style');
-      styleSheet.textContent = styles;
-      document.head.appendChild(styleSheet);
-    }
-
-    // Cleanup on widget destruction
-    destroy() {
-      if (this.ws) {
-        this.ws.close();
-        this.ws = null;
-      }
-    }
-  }
-
-  // Initialize the widget when called
-  window.ChatWidget = function(command, config) {
-    if (command === 'init') {
-      new ChatWidget(config);
-    }
-  };
-  
-  // Process any queued commands
-  if (window.ChatWidget.q) {
-    window.ChatWidget.q.forEach(function(args) {
-      window.ChatWidget.apply(null, args);
-    });
-  }
-})();
-      
       document.body.appendChild(container);
       
       // Apply brand colors
@@ -571,7 +542,6 @@
           height: 16px;
         }
         
-        /* Welcome View */
         .chat-welcome-view {
           flex: 1;
           display: flex;
@@ -627,7 +597,6 @@
           margin: 0;
         }
         
-        /* Chat Messages View */
         .chat-messages-view {
           flex: 1;
           display: flex;
@@ -768,7 +737,6 @@
           30% { opacity: 1; transform: translateY(-4px); }
         }
         
-        /* Footer */
         .chat-widget-footer {
           background: white;
           padding: 20px;
@@ -980,3 +948,4 @@
           }
         }
       `;
+
