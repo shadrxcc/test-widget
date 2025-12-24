@@ -6,7 +6,8 @@
   'use strict';
 
   // Configuration
-  const API_BASE_URL = 'https://staging.dispute.evoolv.com/';
+  const API_BASE_URL = 'https://staging.dispute.evoolv.com';
+  const WS_URL = 'wss://staging.dispute.evoolv.com/user';
   
   class ChatWidget {
     constructor(config) {
@@ -17,6 +18,8 @@
       this.isChatStarted = false;
       this.widgetConfig = null;
       this.messages = [];
+      this.ws = null;
+      this.userId = this.getUserId();
       
       this.init();
     }
@@ -34,13 +37,91 @@
         
         // Add CSS styles
         this.injectStyles();
+        
+        // Connect WebSocket
+        this.connectWebSocket();
       } catch (error) {
         console.error('Chat Widget initialization failed:', error);
       }
     }
 
+    getUserId() {
+      let userId = localStorage.getItem('chat-widget-user-id');
+      if (!userId) {
+        userId = 'guest_' + this.generateUUID();
+        localStorage.setItem('chat-widget-user-id', userId);
+      }
+      return userId;
+    }
+
+    generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    connectWebSocket() {
+      try {
+        // WebSocket doesn't support custom headers in browser
+        // So we send auth as the first message after connection
+        this.ws = new WebSocket(WS_URL);
+
+        this.ws.onopen = () => {
+          console.log('WebSocket connected');
+          // Send authentication message immediately after connection
+          this.ws.send(JSON.stringify({
+            type: 'auth',
+            api_key: this.apiToken,
+            user_id: this.userId
+          }));
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.handleWebSocketMessage(data);
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        this.ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+
+        this.ws.onclose = () => {
+          console.log('WebSocket disconnected');
+          // Attempt to reconnect after 3 seconds
+          setTimeout(() => {
+            if (this.isOpen) {
+              this.connectWebSocket();
+            }
+          }, 3000);
+        };
+      } catch (error) {
+        console.error('Error connecting WebSocket:', error);
+      }
+    }
+
+    handleWebSocketMessage(data) {
+      // Remove typing indicator if exists
+      this.removeTypingIndicator();
+
+      // Handle different message types
+      if (data.type === 'message' || data.message) {
+        const messageText = data.message || data.text || data.content;
+        if (messageText) {
+          this.addMessage(messageText, 'bot');
+        }
+      } else if (data.type === 'typing') {
+        this.showTypingIndicator();
+      }
+    }
+
     async fetchWidgetConfig() {
-      const response = await fetch(`${API_BASE_URL}organizations/chat-widgets`, {
+      const response = await fetch(`${API_BASE_URL}/organizations/chat-widgets`, {
         headers: {
           'apiKey': this.apiToken,
           'Content-Type': 'application/json'
@@ -128,11 +209,40 @@
             
             <div class="chat-widget-powered">
               <span class="powered-text">Powered by:</span>
-              <img src="https://evoolv-upload-bucket.s3.amazonaws.com/57271314-b2a9-4d43-b297-cad6c4e958b4-small-logo.webp" alt="Evoolv logo"/>
+              <img src="https://evoolv-upload-bucket.s3.amazonaws.com/57271314-b2a9-4d43-b297-cad6c4e958b4-small-logo.webp" alt="Evoolv logo" class="powered-logo-img"/>
             </div>
           </div>
         </div>
       `;
+      
+      const styleSheet = document.createElement('style');
+      styleSheet.textContent = styles;
+      document.head.appendChild(styleSheet);
+    }
+
+    // Cleanup on widget destruction
+    destroy() {
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
+    }
+  }
+
+  // Initialize the widget when called
+  window.ChatWidget = function(command, config) {
+    if (command === 'init') {
+      new ChatWidget(config);
+    }
+  };
+  
+  // Process any queued commands
+  if (window.ChatWidget.q) {
+    window.ChatWidget.q.forEach(function(args) {
+      window.ChatWidget.apply(null, args);
+    });
+  }
+})();
       
       document.body.appendChild(container);
       
@@ -214,11 +324,18 @@
       document.querySelector('.close-icon').style.display = 'none';
     }
 
-    async sendMessage() {
+    sendMessage() {
       const input = document.getElementById('chat-input');
       const message = input.value.trim();
       
       if (!message) return;
+      
+      // Check WebSocket connection
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this.addMessage('Connection lost. Reconnecting...', 'bot');
+        this.connectWebSocket();
+        return;
+      }
       
       // Switch to chat view if on welcome screen
       if (!this.isChatStarted) {
@@ -234,35 +351,21 @@
       this.addMessage(message, 'user');
       input.value = '';
       
-      // Show typing indicator
-      this.showTypingIndicator();
-      
+      // Send message via WebSocket
       try {
-        // Send message to backend
-        const response = await fetch(`${API_BASE_URL}/chat/message`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: message,
-            conversationId: this.getConversationId()
-          })
-        });
+        this.ws.send(JSON.stringify({
+          type: 'message',
+          message: message,
+          userId: this.userId,
+          timestamp: new Date().toISOString()
+        }));
         
-        const data = await response.json();
-        
-        // Remove typing indicator
-        this.removeTypingIndicator();
-        
-        // Add bot response
-        this.addMessage(data.message, 'bot');
-        
+        // Show typing indicator
+        this.showTypingIndicator();
       } catch (error) {
-        this.removeTypingIndicator();
-        this.addMessage('Sorry, something went wrong. Please try again.', 'bot');
         console.error('Error sending message:', error);
+        this.removeTypingIndicator();
+        this.addMessage('Failed to send message. Please try again.', 'bot');
       }
     }
 
@@ -318,6 +421,9 @@
     }
 
     showTypingIndicator() {
+      // Don't add if already exists
+      if (document.getElementById('typing-indicator')) return;
+      
       const messagesContainer = document.getElementById('chat-messages');
       const typingDiv = document.createElement('div');
       typingDiv.className = 'chat-message bot-message typing-indicator';
@@ -346,15 +452,6 @@
     removeTypingIndicator() {
       const indicator = document.getElementById('typing-indicator');
       if (indicator) indicator.remove();
-    }
-
-    getConversationId() {
-      let conversationId = localStorage.getItem('chat-widget-conversation-id');
-      if (!conversationId) {
-        conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('chat-widget-conversation-id', conversationId);
-      }
-      return conversationId;
     }
 
     escapeHtml(text) {
@@ -735,32 +832,151 @@
           color: #4F46E5;
         }
         
-        .powered-logo {
+        .powered-logo-img {
           width: 20px;
           height: 20px;
-          color: #4F46E5;
+          object-fit: contain;
+        }
+        
+        @media (max-width: 768px) {
+          .chat-widget-button {
+            width: 64px;
+            height: 64px;
+          }
+          
+          .chat-widget-button svg {
+            width: 32px;
+            height: 32px;
+          }
+          
+          .chat-widget-window {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            max-height: 100vh;
+            border-radius: 0;
+          }
+          
+          .chat-widget-header {
+            padding: 24px 20px;
+          }
+          
+          .chat-widget-title {
+            font-size: 20px;
+          }
+          
+          .chat-widget-close-btn {
+            width: 32px;
+            height: 32px;
+            padding: 8px;
+          }
+          
+          .chat-widget-close-btn svg {
+            width: 18px;
+            height: 18px;
+          }
+          
+          .chat-welcome-logo {
+            width: 72px;
+            height: 72px;
+          }
+          
+          .chat-logo-img {
+            width: 72px;
+            height: 72px;
+          }
+          
+          .chat-logo-placeholder {
+            width: 32px;
+            height: 32px;
+          }
+          
+          .chat-welcome-title {
+            font-size: 20px;
+          }
+          
+          .chat-welcome-subtitle {
+            font-size: 14px;
+          }
+          
+          .chat-widget-messages {
+            padding: 24px 16px;
+          }
+          
+          .chat-message {
+            margin-bottom: 20px;
+          }
+          
+          .bot-message,
+          .user-message {
+            max-width: 85%;
+          }
+          
+          .message-avatar {
+            width: 32px;
+            height: 32px;
+          }
+          
+          .message-avatar svg {
+            width: 16px;
+            height: 16px;
+          }
+          
+          .message-agent-name {
+            font-size: 16px;
+          }
+          
+          .message-time {
+            font-size: 13px;
+          }
+          
+          .message-content {
+            padding: 14px 16px;
+            font-size: 15px;
+          }
+          
+          .message-status {
+            font-size: 13px;
+          }
+          
+          .chat-widget-footer {
+            padding: 20px 16px 24px;
+          }
+          
+          .chat-widget-input-container {
+            gap: 12px;
+            margin-bottom: 16px;
+          }
+          
+          .chat-widget-input {
+            padding: 14px 18px;
+            font-size: 16px;
+          }
+          
+          .chat-widget-send-btn {
+            width: 52px;
+            height: 52px;
+          }
+          
+          .chat-widget-send-btn svg {
+            width: 20px;
+            height: 20px;
+          }
+          
+          .chat-widget-powered {
+            gap: 10px;
+          }
+          
+          .powered-text {
+            font-size: 14px;
+          }
+          
+          .powered-logo-img {
+            width: 24px;
+            height: 24px;
+          }
         }
       `;
-      
-      const styleSheet = document.createElement('style');
-      styleSheet.textContent = styles;
-      document.head.appendChild(styleSheet);
-    }
-  }
-
-  // Initialize the widget when called
-  window.ChatWidget = function(command, config) {
-    if (command === 'init') {
-      new ChatWidget(config);
-    }
-  };
-  
-  // Process any queued commands
-  if (window.ChatWidget.q) {
-    window.ChatWidget.q.forEach(function(args) {
-      window.ChatWidget.apply(null, args);
-    });
-  }
-})();
-
-
