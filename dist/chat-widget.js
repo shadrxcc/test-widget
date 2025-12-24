@@ -949,3 +949,14 @@
         }
       `;
 
+    `;
+    
+    const styleEl = document.createElement('style');
+    styleEl.textContent = styles;
+    document.head.appendChild(styleEl);
+  }
+
+  // Expose to window
+  window.ChatWidget = ChatWidget;
+
+})();
